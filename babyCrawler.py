@@ -17,11 +17,11 @@ import logging
 HEADERS = {"User-Agent": "BabyCrawlerBot/1.0"}
 
 logging.basicConfig(
-    level=logging.INFO, # INFO shows levels INFO, WARNING, ERROR, and CRITICAL. DEBUG will be ignored
+    level=logging.WARNING, # INFO shows levels INFO, WARNING, ERROR, and CRITICAL. DEBUG will be ignored
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-    logging.FileHandler("crawler.log"),
-    logging.StreamHandler(),
+    logging.FileHandler("crawler.log", mode='w'), # log is overwritten each run
+    #logging.StreamHandler(), #StreamHandler disabled to stop output in terminal - it's gonna look like it hangs, it's aight
     ]
 )
 
@@ -33,11 +33,11 @@ def allowedToCrawl(url, user_agent):
 
     try:
         response = requests.get(base_url, headers=HEADERS, timeout=10)
-        logging.info(f"Response headers for {base_url}: {response.headers}")  # Diagnostic output
+        logging.warning(f"Response headers for {base_url}: {response.headers}")  # Diagnostic output
 
         # Check if response is valid and not a redirect
         if response.status_code != 200:
-            logging.info(f"Error: Non-200 status code ({response.status_code}) for {base_url}")
+            logging.warning(f"Error: Non-200 status code ({response.status_code}) for {base_url}")
             return False
 
         # Check for valid robots.txt content
@@ -50,25 +50,25 @@ def allowedToCrawl(url, user_agent):
                 decompressed_content = gzip.GzipFile(fileobj=BytesIO(response.content)).read()
                 rp.parse(decompressed_content.decode("utf-8").splitlines())
             except OSError as e:
-                logging.info(f"Error decompressing robots.txt from {base_url}: {e}")
+                logging.warning(f"Error decompressing robots.txt from {base_url}: {e}")
                 return False
         else:
-            logging.info(f"Unexpected content type for robots.txt from {base_url}: {response.headers.get('Content-Type')}")
+            logging.warning(f"Unexpected content type for robots.txt from {base_url}: {response.headers.get('Content-Type')}")
             return False
 
     except UnicodeDecodeError as e:
-        logging.info(f"Error decoding robots.txt from {base_url}: {e}")
+        logging.warning(f"Error decoding robots.txt from {base_url}: {e}")
         return False
     except Exception as e:
-        logging.info(f"Error fetching robots.txt from {base_url}: {e}")
+        logging.warning(f"Error fetching robots.txt from {base_url}: {e}")
         return False
 
     # Use can_fetch() method to check if the user-agent is allowed to crawl
     if rp.can_fetch(user_agent, url):
-        logging.info(f"robots say yes to crawling {url}")
+        logging.warning(f"robots say yes to crawling {url}")
         return True
     else:
-        logging.info(f"robots say no to crawling {url}")
+        logging.warning(f"robots say no to crawling {url}")
         return False
 
 def babyCrawler(start_url, max_pages, visited=None):
@@ -87,7 +87,7 @@ def babyCrawler(start_url, max_pages, visited=None):
 
         # check robots.txt before crawling
         if not allowedToCrawl(url, HEADERS["User-Agent"]):
-            logging.info(f"robots say to skip {url}")
+            logging.warning(f"robots say to skip {url}")
             continue
 
         try:
@@ -96,7 +96,7 @@ def babyCrawler(start_url, max_pages, visited=None):
                 continue
 
             visited.add(url)
-            logging.info(f"currently crawling: {url}")
+            logging.warning(f"currently crawling: {url}")
 
             soup = BeautifulSoup(response.text, 'html.parser')
             for link in soup.find_all('a', href=True):
@@ -108,21 +108,23 @@ def babyCrawler(start_url, max_pages, visited=None):
                 log.write(f"error crawling {url}: {e}\n")
 
         else:
-            logging.info(f"skipped external link {full_url}")
+            logging.warning(f"skipped external link {full_url}")
 
     return visited
 
 seed_urls = [
-    "https://www.openai.com",
-    "https://www.anthropic.com/",
-    "https://deepmind.google/"
+    #"https://www.openai.com",
+    "https://www.anthropic.com/"
+    #"https://deepmind.google/"
 ]
 # crawl all seed urls
 visited_pages = set()
 for url in seed_urls:
-    logging.info(f"seed url: {url}")
+    logging.warning(f"seed url: {url}")
     visited_pages = babyCrawler(url,max_pages=50, visited=visited_pages)
-    logging.info(f"crawled {len(visited_pages)} unique pages so far")
+    logging.warning(f"crawled {len(visited_pages)} unique pages so far")
 
-# with open("visitedpages.txt") as file:
-    # file.write(f"{url}\n")
+# Write all visited URLs to a text file
+with open("visitedpages.txt", "w") as file:  # Open file in write mode
+    for url in visited_pages:  # Iterate through the set of visited URLs
+        file.write(f"{url}\n")  # Write each URL on a new line
