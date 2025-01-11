@@ -1,7 +1,6 @@
 # baby's first web crawler
 # getting hands on experience with building a web crawler
 # my silly plan is to start small and widen my scope as i figure out what i'm doing
-# gonna feed the crawler the homepages for the top x amount of ai commpanies in the states and send it down a link-clicking rabbit hole.
 # not sure what to do yet after that
 # i'm using chatgpt for help because i have no idea what i'm doing wheee
 
@@ -12,17 +11,54 @@ from urllib.robotparser import RobotFileParser
 from io import BytesIO
 import gzip
 import logging 
+import json 
+import os
 
 # user-agent header defined globally
 HEADERS = {"User-Agent": "BabyCrawlerBot/1.0"}
+class JSONLogHandler(logging.Handler):
+    def __init__(self, filename, log_dir="logs"):
+        super().__init__()
+        self.log_dir = log_dir
+        self.filename = filename
+
+        # Ensure the log directory exists
+        os.makedirs(self.log_dir, exist_ok=True)
+
+        # Combine directory and filename to create the full file path
+        self.filepath = os.path.join(self.log_dir, self.filename)
+
+    def emit(self, record):
+        # Ensure the formatter is set and use it to format the timestamp
+        if self.formatter:
+            timestamp = self.formatter.formatTime(record, datefmt="%Y-%m-%d %H:%M:%S")
+        else:
+            # Fallback in case no formatter is set
+            timestamp = record.created
+
+        # Convert log record to dictionary
+        log_entry = {
+            "timestamp": timestamp,
+            "level": record.levelname,
+            "message": record.getMessage(),
+            "module": record.module,
+            "line": record.lineno,
+            "function": record.funcName,
+        }
+
+        # Serialize as JSON and write to the file
+        with open(self.filepath, "a") as file:
+            file.write(json.dumps(log_entry) + "\n")
+
+
+# Configure logging to use the custom JSON handler
+json_handler = JSONLogHandler("crawler_logs.json")
+formatter = logging.Formatter("%(asctime)s")  # Format the timestamp
+json_handler.setFormatter(formatter)
 
 logging.basicConfig(
-    level=logging.WARNING, # INFO shows levels INFO, WARNING, ERROR, and CRITICAL. DEBUG will be ignored
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[
-    logging.FileHandler("crawler.log", mode='w'), # log is overwritten each run
-    #logging.StreamHandler(), #StreamHandler disabled to stop output in terminal - it's gonna look like it hangs, it's aight
-    ]
+    level=logging.INFO,
+    handlers=[json_handler]
 )
 
 def allowedToCrawl(url, user_agent):
